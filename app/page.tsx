@@ -1,0 +1,162 @@
+"use client"
+
+import { useState, useCallback } from "react"
+import { Header } from "@/components/header"
+import { ControlPanel } from "@/components/control-panel"
+import { PreviewPanel } from "@/components/preview-panel"
+import { Modal } from "@/components/modal"
+import { PDFExportDialog } from "@/components/pdf-export-dialog"
+
+interface ProjectInfo {
+  name: string
+  location: string
+  client: string
+  summary: string
+  projectType: string
+  detailedType: string
+}
+
+interface Condition {
+  id: string
+  text: string
+}
+
+interface SelectedConditions {
+  [key: string]: {
+    basic: Condition[]
+    construction: Condition[]
+    safety: Condition[]
+    quality: Condition[]
+    custom: Condition[]
+  }
+}
+
+export default function QuoteGeneratorPage() {
+  const [projectInfo, setProjectInfo] = useState<ProjectInfo>({
+    name: "",
+    location: "",
+    client: "",
+    summary: "",
+    projectType: "건축공사",
+    detailedType: "tile_work",
+  })
+
+  const [selectedConditions, setSelectedConditions] = useState<SelectedConditions>({
+    tile_work: {
+      basic: [],
+      construction: [],
+      safety: [],
+      quality: [],
+      custom: [],
+    },
+    framing_work: {
+      basic: [],
+      construction: [],
+      safety: [],
+      quality: [],
+      custom: [],
+    },
+    finishing_work: {
+      basic: [],
+      construction: [],
+      safety: [],
+      quality: [],
+      custom: [],
+    },
+    painting_work: {
+      basic: [],
+      construction: [],
+      safety: [],
+      quality: [],
+      custom: [],
+    },
+    interior_woodwork: {
+      basic: [],
+      construction: [],
+      safety: [],
+      quality: [],
+      custom: [],
+    },
+  })
+
+  const [modalState, setModalState] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "success" as "success" | "warning" | "error",
+  })
+
+  const [showPDFDialog, setShowPDFDialog] = useState(false)
+
+  const showModal = useCallback((title: string, message: string, type: "success" | "warning" | "error") => {
+    setModalState({ isOpen: true, title, message, type })
+  }, [])
+
+  const hideModal = useCallback(() => {
+    setModalState((prev) => ({ ...prev, isOpen: false }))
+  }, [])
+
+  const handleExportPdf = useCallback(() => {
+    setShowPDFDialog(true)
+  }, [])
+
+  const handlePDFExportSuccess = useCallback(
+    (message: string) => {
+      showModal("내보내기 완료", message, "success")
+      setShowPDFDialog(false)
+    },
+    [showModal],
+  )
+
+  const handlePDFExportError = useCallback(
+    (message: string) => {
+      showModal("내보내기 오류", message, "error")
+    },
+    [showModal],
+  )
+
+  const handleTempSave = useCallback(() => {
+    const saveData = {
+      projectInfo,
+      selectedConditions,
+      timestamp: new Date().toISOString(),
+    }
+    localStorage.setItem("quote-generator-temp-save", JSON.stringify(saveData))
+    showModal("저장 완료", "현재 작업 내용이 임시 저장되었습니다.", "success")
+  }, [projectInfo, selectedConditions, showModal])
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-50">
+      <Header onExportPdf={handleExportPdf} onTempSave={handleTempSave} />
+
+      <main className="flex-grow flex overflow-hidden">
+        <ControlPanel
+          projectInfo={projectInfo}
+          setProjectInfo={setProjectInfo}
+          selectedConditions={selectedConditions}
+          setSelectedConditions={setSelectedConditions}
+          showModal={showModal}
+        />
+
+        <PreviewPanel projectInfo={projectInfo} selectedConditions={selectedConditions} />
+      </main>
+
+      <Modal
+        isOpen={modalState.isOpen}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        onClose={hideModal}
+      />
+
+      <PDFExportDialog
+        isOpen={showPDFDialog}
+        onClose={() => setShowPDFDialog(false)}
+        projectInfo={projectInfo}
+        selectedConditions={selectedConditions}
+        onSuccess={handlePDFExportSuccess}
+        onError={handlePDFExportError}
+      />
+    </div>
+  )
+}
