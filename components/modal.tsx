@@ -9,9 +9,10 @@ interface ModalProps {
   message: string
   type: "success" | "warning" | "error"
   onClose: () => void
+  onConfirm?: () => void // 추가된 콜백 함수
 }
 
-export function Modal({ isOpen, title, message, type, onClose }: ModalProps) {
+export function Modal({ isOpen, title, message, type, onClose, onConfirm }: ModalProps) {
   if (!isOpen) return null
 
   const getIcon = () => {
@@ -25,6 +26,13 @@ export function Modal({ isOpen, title, message, type, onClose }: ModalProps) {
     }
   }
 
+  const handleConfirm = () => {
+    if (onConfirm) {
+      onConfirm()
+    }
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4 animate-in fade-in-0 zoom-in-95">
@@ -32,9 +40,16 @@ export function Modal({ isOpen, title, message, type, onClose }: ModalProps) {
           {getIcon()}
           <h3 className="text-xl font-semibold text-center text-balance">{title}</h3>
           <p className="text-gray-600 text-center text-balance">{message}</p>
-          <Button onClick={onClose} className="mt-4">
-            확인
-          </Button>
+          <div className="flex gap-2 mt-4">
+            {onConfirm && (
+              <Button onClick={handleConfirm} className="bg-blue-600 hover:bg-blue-700">
+                확인
+              </Button>
+            )}
+            <Button onClick={onClose} variant={onConfirm ? "outline" : "default"}>
+              {onConfirm ? "취소" : "확인"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

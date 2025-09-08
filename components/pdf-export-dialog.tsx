@@ -15,10 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
 import { Progress } from "@/components/ui/progress"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { FileDown, Settings, AlertTriangle, CheckCircle, Loader2 } from "lucide-react"
+import { FileDown, Settings, CheckCircle, Loader2, AlertTriangle } from "lucide-react"
 import { type PDFExportOptions, defaultPDFOptions, exportToPDF, validateExportData } from "@/lib/pdf-export"
 
 interface PDFExportDialogProps {
@@ -53,11 +52,6 @@ export function PDFExportDialog({
   const validation = validateExportData(exportData)
 
   const handleExport = async () => {
-    if (!validation.isValid) {
-      onError(validation.errors.join("\n"))
-      return
-    }
-
     setIsExporting(true)
     setExportProgress(0)
 
@@ -109,16 +103,17 @@ export function PDFExportDialog({
             </div>
 
             {!validation.isValid && (
-              <Alert className="mb-3">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <ul className="list-disc list-inside space-y-1">
-                    {validation.errors.map((error, index) => (
-                      <li key={index}>{error}</li>
-                    ))}
-                  </ul>
-                </AlertDescription>
-              </Alert>
+              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                  <span className="text-sm font-medium text-red-800">다음 항목을 확인해주세요:</span>
+                </div>
+                <ul className="list-disc list-inside space-y-1 text-sm text-red-700">
+                  {validation.errors.map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             <div className="grid grid-cols-2 gap-4 text-sm">

@@ -14,11 +14,20 @@ interface ProjectInfo {
   summary: string
   projectType: string
   detailedType: string
+  exemptionRate?: number
+  orderVolumeRate?: number
+  contactRole?: string
+  contactName?: string
+  contactPhoneRest?: string
+  contactEmailLocal?: string
+  docsUrl?: string
+  docsPassword?: string
 }
 
 interface Condition {
   id: string
   text: string
+  isForced?: boolean
 }
 
 interface SelectedConditions {
@@ -39,7 +48,16 @@ export default function QuoteGeneratorPage() {
     summary: "",
     projectType: "건축공사",
     detailedType: "tile_work",
+    exemptionRate: 100,
+    orderVolumeRate: 100,
+    contactRole: "공무",
+    contactName: "000",
+    contactPhoneRest: "5252-5252",
+    contactEmailLocal: "5252",
   })
+
+  // MISO 워크플로우 결과 텍스트 저장
+  const [misoResult, setMisoResult] = useState<string>("")
 
   const [selectedConditions, setSelectedConditions] = useState<SelectedConditions>({
     tile_work: {
@@ -84,12 +102,13 @@ export default function QuoteGeneratorPage() {
     title: "",
     message: "",
     type: "success" as "success" | "warning" | "error",
+    onConfirm: undefined as (() => void) | undefined,
   })
 
   const [showPDFDialog, setShowPDFDialog] = useState(false)
 
-  const showModal = useCallback((title: string, message: string, type: "success" | "warning" | "error") => {
-    setModalState({ isOpen: true, title, message, type })
+  const showModal = useCallback((title: string, message: string, type: "success" | "warning" | "error", onConfirm?: () => void) => {
+    setModalState({ isOpen: true, title, message, type, onConfirm })
   }, [])
 
   const hideModal = useCallback(() => {
@@ -136,9 +155,10 @@ export default function QuoteGeneratorPage() {
           selectedConditions={selectedConditions}
           setSelectedConditions={setSelectedConditions}
           showModal={showModal}
+          onMisoResult={(text) => setMisoResult(text)}
         />
 
-        <PreviewPanel projectInfo={projectInfo} selectedConditions={selectedConditions} />
+        <PreviewPanel projectInfo={projectInfo} selectedConditions={selectedConditions} setProjectInfo={setProjectInfo} misoResult={misoResult} />
       </main>
 
       <Modal
@@ -147,6 +167,7 @@ export default function QuoteGeneratorPage() {
         message={modalState.message}
         type={modalState.type}
         onClose={hideModal}
+        onConfirm={modalState.onConfirm}
       />
 
       <PDFExportDialog

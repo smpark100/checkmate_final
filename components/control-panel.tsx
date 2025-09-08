@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { ConditionTabs } from "@/components/condition-tabs"
 import { RiskAssessmentPanel } from "@/components/risk-assessment-panel"
-import { RotateCcw, Shield } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { RotateCcw, Shield, FileText, CheckCircle, Info, Tag, CheckSquare } from "lucide-react"
 import { analyzeRisk, type RiskAnalysis } from "@/lib/risk-assessment"
 
 interface ProjectInfo {
@@ -18,6 +19,14 @@ interface ProjectInfo {
   summary: string
   projectType: string
   detailedType: string
+  exemptionRate?: number
+  orderVolumeRate?: number
+  contactRole?: string
+  contactName?: string
+  contactPhoneRest?: string
+  contactEmailLocal?: string
+  docsUrl?: string
+  docsPassword?: string
 }
 
 interface ControlPanelProps {
@@ -25,7 +34,8 @@ interface ControlPanelProps {
   setProjectInfo: (info: ProjectInfo) => void
   selectedConditions: any
   setSelectedConditions: (conditions: any) => void
-  showModal: (title: string, message: string, type: "success" | "warning" | "error") => void
+  showModal: (title: string, message: string, type: "success" | "warning" | "error", onConfirm?: () => void) => void
+  onMisoResult?: (text: string) => void
 }
 
 export function ControlPanel({
@@ -34,11 +44,19 @@ export function ControlPanel({
   selectedConditions,
   setSelectedConditions,
   showModal,
+  onMisoResult,
 }: ControlPanelProps) {
   const [customConditionText, setCustomConditionText] = useState("")
   const [riskAnalysis, setRiskAnalysis] = useState<RiskAnalysis | null>(null)
   const [showRiskAnalysis, setShowRiskAnalysis] = useState(false)
+  const [siteSearchTerm, setSiteSearchTerm] = useState("")
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [siteOptions, setSiteOptions] = useState<Array<{ label: string; value: string }>>([])
+  const [presets, setPresets] = useState<Record<string, any>>({})
+  
+  // 계약조건 선택 상태
+  const [selectedTag, setSelectedTag] = useState("주차장")
+  const [selectedContent, setSelectedContent] = useState<string[]>([])
 
   useEffect(() => {
     const savedData = localStorage.getItem("quote-generator-temp-save")
@@ -62,6 +80,22 @@ export function ControlPanel({
     }
   }, [showModal])
 
+  // Load site presets from API
+  useEffect(() => {
+    fetch("/api/site-presets")
+      .then((res) => res.json())
+      .then((data) => {
+        const opts = (data.presets || []).map((p: any) => ({ label: p.siteName, value: p.siteName }))
+        setSiteOptions(opts)
+        const map: Record<string, any> = {}
+        ;(data.presets || []).forEach((p: any) => {
+          map[p.siteName] = p
+        })
+        setPresets(map)
+      })
+      .catch(() => {})
+  }, [])
+
   const handleProjectInfoChange = (field: keyof ProjectInfo, value: string) => {
     setProjectInfo({ ...projectInfo, [field]: value })
   }
@@ -73,24 +107,55 @@ export function ControlPanel({
     }
 
     setIsAnalyzing(true)
+    try {
+      // Call backend MISO workflow API
+      const res = await fetch("/api/miso/workflow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input_text: customConditionText.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || "API 오류")
+      }
 
-    setTimeout(() => {
-      const analysis = analyzeRisk(customConditionText)
+      // Send MISO result upward
+      onMisoResult?.(data?.result ?? "")
+
+      // Create analysis based on MISO result
+      const misoResult = data?.result ?? ""
+      const hasUnfairClause = misoResult.includes("부당특약") || misoResult.includes("부당")
+      
+      const analysis = {
+        score: hasUnfairClause ? 75 : 5,
+        level: hasUnfairClause ? "high" as const : "low" as const,
+        category: hasUnfairClause ? "부당특약" : "일반사항",
+        issues: hasUnfairClause ? ["부당특약 발견"] : [],
+        suggestions: [misoResult], // MISO 결과를 권장사항으로 사용
+        blockedKeywords: [],
+      }
+      
       setRiskAnalysis(analysis)
       setShowRiskAnalysis(true)
-      setIsAnalyzing(false)
 
+      // Optionally persist brief history
       const history = JSON.parse(localStorage.getItem("risk-analysis-history") || "[]")
       history.push({
         text: customConditionText,
         analysis,
         timestamp: new Date().toISOString(),
+        misoResult: data?.result ?? "",
       })
       if (history.length > 10) {
         history.shift()
       }
       localStorage.setItem("risk-analysis-history", JSON.stringify(history))
-    }, 1000)
+    } catch (e: any) {
+      console.error(e)
+      showModal("API 오류", e?.message || "미소 API 호출 중 오류가 발생했습니다.", "error")
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   const handleAddCustomCondition = () => {
@@ -100,15 +165,34 @@ export function ControlPanel({
     }
 
     if (!riskAnalysis) {
-      showModal("검토 필요", '목록 추가 전, 먼저 "위험도 분석" 버튼을 눌러주세요.', "warning")
+      showModal("경고", "위험도 분석을 수행하지 않고 조건을 추가하면 부당특약이나 위험 요소가 포함될 수 있습니다. 정말 추가하시겠습니까?", "warning")
       return
     }
 
     if (riskAnalysis.level === "critical" || riskAnalysis.level === "high") {
       showModal(
-        "추가 불가",
-        `위험도가 ${riskAnalysis.level === "critical" ? "매우 높은" : "높은"} 조건은 추가할 수 없습니다. 조건을 수정하거나 담당자와 협의하세요.`,
-        "error",
+        "위험도 높음",
+        `위험도가 ${riskAnalysis.level === "critical" ? "매우 높은" : "높은"} 조건입니다. 강제로 추가하시겠습니까?`,
+        "warning",
+        () => {
+          // 강제 추가 로직
+          const newCondition = {
+            id: `custom-${Date.now()}`,
+            text: customConditionText.trim(),
+            riskLevel: riskAnalysis.level,
+            riskScore: riskAnalysis.score,
+            isForced: true, // 강제 추가 플래그
+          }
+
+          const updatedConditions = { ...selectedConditions }
+          updatedConditions[projectInfo.detailedType].custom.push(newCondition)
+          setSelectedConditions(updatedConditions)
+
+          setCustomConditionText("")
+          setRiskAnalysis(null)
+          setShowRiskAnalysis(false)
+          showModal("강제 추가 완료", "위험도가 높은 조건이 강제로 추가되었습니다. 별도 확인이 필요합니다.", "warning")
+        }
       )
       return
     }
@@ -142,74 +226,65 @@ export function ControlPanel({
 
   return (
     <aside className="w-1/3 bg-white border-r border-gray-200 p-6 overflow-y-auto">
-      <div className="space-y-8">
-        <div>
-          <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3">1. 공종 선택</h2>
-          <Select
-            value={projectInfo.projectType}
-            onValueChange={(value) => handleProjectInfoChange("projectType", value)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="건축공사">건축공사</SelectItem>
-              <SelectItem value="토목공사">토목공사</SelectItem>
-              <SelectItem value="전기공사">전기공사</SelectItem>
-              <SelectItem value="설비공사">설비공사</SelectItem>
-              <SelectItem value="소방공사">소방공사</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3">2. 세부 공종 선택</h2>
-          <Select
-            value={projectInfo.detailedType}
-            onValueChange={(value) => handleProjectInfoChange("detailedType", value)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="tile_work">타일 공사</SelectItem>
-              <SelectItem value="framing_work">골조 공사</SelectItem>
-              <SelectItem value="finishing_work">미장 공사</SelectItem>
-              <SelectItem value="painting_work">도장 공사</SelectItem>
-              <SelectItem value="interior_woodwork">내장 목공사</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3">3. 현장 기본 정보</h2>
+      <Tabs defaultValue="project-info" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="project-info">프로젝트 정보</TabsTrigger>
+          <TabsTrigger value="contract-conditions">계약조건 선택</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="project-info" className="space-y-6 mt-6">
+          <div>
+            <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3">1. 현장 기본 정보</h2>
           <div className="space-y-3">
-            <Input
-              placeholder="프로젝트명 (예: OOO 신축공사)"
-              value={projectInfo.name}
-              onChange={(e) => handleProjectInfoChange("name", e.target.value)}
-            />
-            <Input
-              placeholder="공사위치"
-              value={projectInfo.location}
-              onChange={(e) => handleProjectInfoChange("location", e.target.value)}
-            />
-            <Input
-              placeholder="발주처"
-              value={projectInfo.client}
-              onChange={(e) => handleProjectInfoChange("client", e.target.value)}
-            />
-            <Textarea
-              placeholder="공사개요를 간략히 입력하세요..."
-              rows={3}
-              value={projectInfo.summary}
-              onChange={(e) => handleProjectInfoChange("summary", e.target.value)}
-            />
+            <div className="space-y-2">
+              <Input
+                placeholder="현장명을 검색하세요..."
+                value={siteSearchTerm}
+                onChange={(e) => setSiteSearchTerm(e.target.value)}
+                className="w-full"
+              />
+              <Select
+                value={projectInfo.name}
+                onValueChange={(value) => {
+                  handleProjectInfoChange("name", value)
+                  const p = presets[value]
+                  if (p) {
+                    setProjectInfo({
+                      ...projectInfo,
+                      name: value,
+                      exemptionRate: p.exemptionRate ?? projectInfo.exemptionRate,
+                      contactRole: projectInfo.contactRole ?? "공무",
+                      contactName: p.contactName ?? projectInfo.contactName,
+                      contactPhoneRest: p.contactPhoneRest ?? projectInfo.contactPhoneRest,
+                      contactEmailLocal: p.contactEmailLocal ?? projectInfo.contactEmailLocal,
+                      docsUrl: p.docsUrl ?? projectInfo.docsUrl,
+                      docsPassword: p.docsPassword ?? projectInfo.docsPassword,
+                    })
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="현장명을 선택하세요" />
+                </SelectTrigger>
+                <SelectContent>
+                  {siteOptions
+                    .filter(opt => 
+                      siteSearchTerm === "" || 
+                      opt.label.toLowerCase().includes(siteSearchTerm.toLowerCase())
+                    )
+                    .map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
-        <div>
-          <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3">4. 조건 선택 및 추가</h2>
+          <div>
+            <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3">2. 조건 선택 및 추가</h2>
           <Card className="p-4 bg-gray-50">
             <ConditionTabs
               projectInfo={projectInfo}
@@ -254,14 +329,124 @@ export function ControlPanel({
             <RiskAssessmentPanel analysis={riskAnalysis!} isVisible={showRiskAnalysis && !!riskAnalysis} />
             <Button
               onClick={handleAddCustomCondition}
-              disabled={!riskAnalysis || riskAnalysis.level === "critical" || riskAnalysis.level === "high"}
               className="w-full"
             >
               목록에 추가
             </Button>
           </div>
         </div>
-      </div>
+        </TabsContent>
+
+        <TabsContent value="contract-conditions" className="space-y-6 mt-6">
+          <div>
+            <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3 flex items-center">
+              <FileText className="h-5 w-5 mr-2" />
+              1. 공종 선택
+            </h2>
+            <Select
+              value={projectInfo.projectType}
+              onValueChange={(value) => handleProjectInfoChange("projectType", value)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="건축공사">건축공사</SelectItem>
+                <SelectItem value="토목공사">토목공사</SelectItem>
+                <SelectItem value="전기공사">전기공사</SelectItem>
+                <SelectItem value="설비공사">설비공사</SelectItem>
+                <SelectItem value="소방공사">소방공사</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3 flex items-center">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              2. 세부 공종 선택
+            </h2>
+            <Select
+              value={projectInfo.detailedType}
+              onValueChange={(value) => handleProjectInfoChange("detailedType", value)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tile_work">타일공사</SelectItem>
+                <SelectItem value="framing_work">골조공사</SelectItem>
+                <SelectItem value="finishing_work">미장조적공사</SelectItem>
+                <SelectItem value="painting_work">도장공사</SelectItem>
+                <SelectItem value="interior_woodwork">내장목공사</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3 flex items-center">
+              <Info className="h-5 w-5 mr-2" />
+              3. 중분류
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {["공사사항", "안전사항", "일반사항"].map((subCategory) => (
+                <Button
+                  key={subCategory}
+                  variant="outline"
+                  size="sm"
+                >
+                  {subCategory}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3 flex items-center">
+              <Tag className="h-5 w-5 mr-2" />
+              3. 태그
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {["공용부", "공통", "세대", "옥상", "주차장"].map((tag) => (
+                <Button
+                  key={tag}
+                  variant={selectedTag === tag ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedTag(tag)}
+                >
+                  {tag}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3 flex items-center">
+              <CheckSquare className="h-5 w-5 mr-2" />
+              4. 내용
+            </h2>
+            <div className="space-y-2">
+              {["주차장", "옥상", "지하층", "공용부", "세대"].map((content) => (
+                <div key={content} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id={content}
+                    checked={selectedContent.includes(content)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedContent([...selectedContent, content])
+                      } else {
+                        setSelectedContent(selectedContent.filter(c => c !== content))
+                      }
+                    }}
+                    className="rounded"
+                  />
+                  <label htmlFor={content} className="text-sm">{content}</label>
+                </div>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </aside>
   )
 }

@@ -38,15 +38,11 @@ export function validateExportData(data: ExportData): { isValid: boolean; errors
   const errors: string[] = []
 
   if (!data.projectInfo.name.trim()) {
-    errors.push("프로젝트명을 입력해주세요.")
+    errors.push("현장명을 입력해주세요.")
   }
 
-  if (!data.projectInfo.location.trim()) {
-    errors.push("공사위치를 입력해주세요.")
-  }
-
-  if (!data.projectInfo.client.trim()) {
-    errors.push("발주처를 입력해주세요.")
+  if (!data.projectInfo.projectType.trim()) {
+    errors.push("공종을 선택해주세요.")
   }
 
   // Check if at least one condition is selected
@@ -73,6 +69,30 @@ export function generateFileName(projectInfo: any, template: string): string {
   return `${projectName}_견적조건서${templateSuffix}_${date}.pdf`
 }
 
+export function sanitizeElementForPDF(element: HTMLElement): void {
+  // Remove all CSS classes
+  element.className = ""
+  
+  // Remove all child elements' CSS classes and problematic styles
+  const allElements = element.querySelectorAll('*')
+  allElements.forEach((el: Element) => {
+    const htmlEl = el as HTMLElement
+    
+    // Remove all CSS classes
+    htmlEl.className = ""
+    
+    // Force safe inline styles
+    htmlEl.style.backgroundColor = htmlEl.style.backgroundColor.includes('oklch') ? '#ffffff' : htmlEl.style.backgroundColor
+    htmlEl.style.color = htmlEl.style.color.includes('oklch') ? '#000000' : htmlEl.style.color
+    htmlEl.style.borderColor = htmlEl.style.borderColor.includes('oklch') ? '#cccccc' : htmlEl.style.borderColor
+    
+    // Set basic safe styles
+    if (!htmlEl.style.backgroundColor) htmlEl.style.backgroundColor = '#ffffff'
+    if (!htmlEl.style.color) htmlEl.style.color = '#000000'
+    if (!htmlEl.style.fontFamily) htmlEl.style.fontFamily = 'Arial, sans-serif'
+  })
+}
+
 export async function exportToPDF(
   elementId: string,
   exportData: ExportData,
@@ -88,6 +108,10 @@ export async function exportToPDF(
     throw new Error(validation.errors.join("\n"))
   }
 
+  // Store original values outside try block
+  const originalStyle = element.style.cssText
+  const originalClasses = element.className
+
   try {
     onProgress?.(10)
 
@@ -95,13 +119,17 @@ export async function exportToPDF(
     const html2pdf = await import("html2pdf.js")
     onProgress?.(30)
 
-    // Prepare the element for PDF export
-    const originalStyle = element.style.cssText
+    // Apply PDF-safe styles
     element.style.width = "210mm" // A4 width
     element.style.minHeight = "297mm" // A4 height
     element.style.padding = "20mm"
     element.style.boxSizing = "border-box"
     element.style.backgroundColor = "white"
+    element.style.color = "black"
+    element.style.fontFamily = "Arial, sans-serif"
+    
+    // Sanitize all elements to remove problematic CSS
+    sanitizeElementForPDF(element)
 
     onProgress?.(50)
 
@@ -113,10 +141,27 @@ export async function exportToPDF(
         quality: exportData.exportOptions.quality,
       },
       html2canvas: {
-        scale: 2,
-        useCORS: true,
-        letterRendering: true,
-        allowTaint: false,
+        scale: 1,
+        useCORS: false,
+        letterRendering: false,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        removeContainer: true,
+        foreignObjectRendering: false,
+        logging: false,
+        width: element.scrollWidth,
+        height: element.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight,
+        ignoreElements: (element) => {
+          // Skip elements with problematic styles
+          const style = window.getComputedStyle(element)
+          return style.backgroundColor.includes('oklch') || 
+                 style.color.includes('oklch') || 
+                 style.borderColor.includes('oklch')
+        },
       },
       jsPDF: {
         unit: "in",
@@ -133,29 +178,41 @@ export async function exportToPDF(
 
     onProgress?.(70)
 
+    // Add a small delay to ensure styles are applied
+    await new Promise(resolve => setTimeout(resolve, 100))
+
     await html2pdf.default().from(element).set(options).save()
 
     onProgress?.(90)
 
-    // Restore original styles
-    element.style.cssText = originalStyle
+    // Save export history
+    try {
+      const history = JSON.parse(localStorage.getItem("pdf-export-history") || "[]")
+      history.unshift({
+        ...exportData,
+        exportedAt: new Date().toISOString(),
+      })
+      if (history.length > 20) {
+        history.splice(20)
+      }
+      localStorage.setItem("pdf-export-history", JSON.stringify(history))
+    } catch (storageError) {
+      console.warn("Failed to save export history:", storageError)
+    }
 
     onProgress?.(100)
 
-    // Save export history
-    const history = JSON.parse(localStorage.getItem("pdf-export-history") || "[]")
-    history.unshift({
-      ...exportData,
-      exportedAt: new Date().toISOString(),
-    })
-    if (history.length > 20) {
-      history.splice(20)
-    }
-    localStorage.setItem("pdf-export-history", JSON.stringify(history))
   } catch (error) {
-    // Restore original styles in case of error
-    element.style.cssText = element.style.cssText
-    throw error
+    console.error("PDF export error:", error)
+    throw new Error(`PDF 생성 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
+  } finally {
+    // Always restore original styles
+    try {
+      element.style.cssText = originalStyle
+      element.className = originalClasses
+    } catch (restoreError) {
+      console.warn("Failed to restore original styles:", restoreError)
+    }
   }
 }
 

@@ -25,17 +25,8 @@ interface ConditionTabsProps {
 }
 
 export function ConditionTabs({ projectInfo, selectedConditions, setSelectedConditions }: ConditionTabsProps) {
-  const [activeTab, setActiveTab] = useState("basic")
   const [searchTerm, setSearchTerm] = useState("")
   const [showOnlySelected, setShowOnlySelected] = useState(false)
-
-  const tabs = [
-    { id: "basic", label: "현장기본조건", color: "blue" },
-    { id: "construction", label: "공사사항", color: "green" },
-    { id: "safety", label: "안전사항", color: "red" },
-    { id: "quality", label: "품질사항", color: "purple" },
-    { id: "custom", label: "현장 특수사항", color: "orange" },
-  ]
 
   const handleConditionChange = (conditionId: string, checked: boolean, tab: string) => {
     const updatedConditions = { ...selectedConditions }
@@ -75,18 +66,8 @@ export function ConditionTabs({ projectInfo, selectedConditions, setSelectedCond
   }
 
   const filteredConditions = useMemo(() => {
-    if (activeTab === "custom") {
-      const customConditions = selectedConditions[projectInfo.detailedType].custom
-      if (customConditions.length === 0) return []
-
-      return customConditions.filter((condition: any) =>
-        condition.text.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    }
-
-    const dataSource =
-      activeTab === "basic" ? conditionData.basic : conditionData[projectInfo.detailedType]?.[activeTab] || []
-    const selectedInTab = selectedConditions[projectInfo.detailedType][activeTab]
+    const dataSource = conditionData.basic
+    const selectedInTab = selectedConditions[projectInfo.detailedType]["basic"]
 
     return dataSource.filter((condition: any) => {
       const matchesSearch = condition.text.toLowerCase().includes(searchTerm.toLowerCase())
@@ -97,7 +78,7 @@ export function ConditionTabs({ projectInfo, selectedConditions, setSelectedCond
       }
       return matchesSearch
     })
-  }, [activeTab, searchTerm, showOnlySelected, selectedConditions, projectInfo.detailedType])
+  }, [searchTerm, showOnlySelected, selectedConditions, projectInfo.detailedType])
 
   const getSelectedCount = (tab: string) => {
     return selectedConditions[projectInfo.detailedType][tab]?.length || 0
@@ -113,18 +94,14 @@ export function ConditionTabs({ projectInfo, selectedConditions, setSelectedCond
 
   const renderConditions = () => {
     if (filteredConditions.length === 0) {
-      if (activeTab === "custom") {
-        return <p className="text-gray-500 text-center py-8">추가된 현장 특수사항이 없습니다.</p>
-      }
       if (searchTerm) {
         return <p className="text-gray-500 text-center py-8">검색 결과가 없습니다.</p>
       }
-      return <p className="text-gray-500 text-center py-8">해당 공종에 대한 조건이 없습니다.</p>
+      return <p className="text-gray-500 text-center py-8">현장기본조건이 없습니다.</p>
     }
 
     return filteredConditions.map((condition: any) => {
-      const isChecked = selectedConditions[projectInfo.detailedType][activeTab].some((c: any) => c.id === condition.id)
-      const isCustom = activeTab === "custom"
+      const isChecked = selectedConditions[projectInfo.detailedType]["basic"].some((c: any) => c.id === condition.id)
 
       return (
         <Card
@@ -133,16 +110,15 @@ export function ConditionTabs({ projectInfo, selectedConditions, setSelectedCond
         >
           <div className="flex items-start gap-3">
             <Checkbox
-              checked={isCustom ? true : isChecked}
+              checked={isChecked}
               onCheckedChange={(checked) =>
-                !isCustom && handleConditionChange(condition.id, checked as boolean, activeTab)
+                handleConditionChange(condition.id, checked as boolean, "basic")
               }
               className="mt-1 flex-shrink-0"
-              disabled={isCustom}
             />
             <div className="flex-1 min-w-0">
               <p className="text-sm text-gray-700 leading-relaxed text-pretty">{condition.text}</p>
-              {isChecked && !isCustom && (
+              {isChecked && (
                 <Badge variant="secondary" className="mt-2 text-xs">
                   선택됨
                 </Badge>
@@ -156,33 +132,12 @@ export function ConditionTabs({ projectInfo, selectedConditions, setSelectedCond
 
   return (
     <div className="space-y-4">
-      {/* 탭 메뉴 */}
-      <div className="border-b border-gray-200">
-        <nav className="flex space-x-1 overflow-x-auto">
-          {tabs.map((tab) => {
-            const selectedCount = getSelectedCount(tab.id)
-            const totalCount = getTotalCount(tab.id)
-
-            return (
-              <Button
-                key={tab.id}
-                variant={activeTab === tab.id ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-shrink-0 ${
-                  activeTab === tab.id ? "bg-blue-600 text-white" : "text-gray-500 hover:text-blue-600"
-                }`}
-              >
-                <span>{tab.label}</span>
-                {totalCount > 0 && (
-                  <Badge variant={activeTab === tab.id ? "secondary" : "outline"} className="ml-2 text-xs">
-                    {selectedCount}/{totalCount}
-                  </Badge>
-                )}
-              </Button>
-            )
-          })}
-        </nav>
+      {/* 현장기본조건 헤더 */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium text-gray-900">현장기본조건</h3>
+        <Badge variant="outline" className="text-xs">
+          {getSelectedCount("basic")}/{getTotalCount("basic")}
+        </Badge>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -207,19 +162,19 @@ export function ConditionTabs({ projectInfo, selectedConditions, setSelectedCond
           </Button>
         </div>
 
-        {activeTab !== "custom" && getTotalCount(activeTab) > 0 && (
+        {getTotalCount("basic") > 0 && (
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => handleSelectAll(activeTab)} className="h-8 px-2">
+              <Button variant="ghost" size="sm" onClick={() => handleSelectAll("basic")} className="h-8 px-2">
                 <CheckSquare className="h-4 w-4 mr-1" />
                 전체 선택
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleDeselectAll(activeTab)} className="h-8 px-2">
+              <Button variant="ghost" size="sm" onClick={() => handleDeselectAll("basic")} className="h-8 px-2">
                 <Square className="h-4 w-4 mr-1" />
                 전체 해제
               </Button>
             </div>
-            <div className="text-gray-500">{getSelectedCount(activeTab)}개 선택됨</div>
+            <div className="text-gray-500">{getSelectedCount("basic")}개 선택됨</div>
           </div>
         )}
       </div>
@@ -228,7 +183,7 @@ export function ConditionTabs({ projectInfo, selectedConditions, setSelectedCond
         <span>
           현재 공종: <strong>{workTypeNames[projectInfo.detailedType as keyof typeof workTypeNames]}</strong>
         </span>
-        <span>{conditionCategories[activeTab as keyof typeof conditionCategories]?.description}</span>
+        <span>모든 공종에 공통으로 적용되는 기본 조건</span>
       </div>
 
       {/* 탭 컨텐츠 */}
