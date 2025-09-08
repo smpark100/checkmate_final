@@ -6,10 +6,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { ConditionTabs } from "@/components/condition-tabs"
+import { ContractConditionSelector } from "@/components/ContractConditionSelector"
 import { RiskAssessmentPanel } from "@/components/risk-assessment-panel"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { RotateCcw, Shield, FileText, CheckCircle, Info, Tag, CheckSquare } from "lucide-react"
+import { RotateCcw, Shield } from "lucide-react"
 import { analyzeRisk, type RiskAnalysis } from "@/lib/risk-assessment"
 
 interface ProjectInfo {
@@ -54,9 +54,6 @@ export function ControlPanel({
   const [siteOptions, setSiteOptions] = useState<Array<{ label: string; value: string }>>([])
   const [presets, setPresets] = useState<Record<string, any>>({})
   
-  // 계약조건 선택 상태
-  const [selectedTag, setSelectedTag] = useState("주차장")
-  const [selectedContent, setSelectedContent] = useState<string[]>([])
 
   useEffect(() => {
     const savedData = localStorage.getItem("quote-generator-temp-save")
@@ -286,11 +283,8 @@ export function ControlPanel({
           <div>
             <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3">2. 조건 선택 및 추가</h2>
           <Card className="p-4 bg-gray-50">
-            <ConditionTabs
-              projectInfo={projectInfo}
-              selectedConditions={selectedConditions}
-              setSelectedConditions={setSelectedConditions}
-            />
+            {/* 기존 ConditionTabs는 계약조건 선택 탭으로 이동됨 */}
+            <p className="text-sm text-gray-600">계약조건 선택은 상단의 "계약조건 선택" 탭을 이용하세요.</p>
           </Card>
         </div>
 
@@ -338,113 +332,12 @@ export function ControlPanel({
         </TabsContent>
 
         <TabsContent value="contract-conditions" className="space-y-6 mt-6">
-          <div>
-            <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3 flex items-center">
-              <FileText className="h-5 w-5 mr-2" />
-              1. 공종 선택
-            </h2>
-            <Select
-              value={projectInfo.projectType}
-              onValueChange={(value) => handleProjectInfoChange("projectType", value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="건축공사">건축공사</SelectItem>
-                <SelectItem value="토목공사">토목공사</SelectItem>
-                <SelectItem value="전기공사">전기공사</SelectItem>
-                <SelectItem value="설비공사">설비공사</SelectItem>
-                <SelectItem value="소방공사">소방공사</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3 flex items-center">
-              <CheckCircle className="h-5 w-5 mr-2" />
-              2. 세부 공종 선택
-            </h2>
-            <Select
-              value={projectInfo.detailedType}
-              onValueChange={(value) => handleProjectInfoChange("detailedType", value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tile_work">타일공사</SelectItem>
-                <SelectItem value="framing_work">골조공사</SelectItem>
-                <SelectItem value="finishing_work">미장조적공사</SelectItem>
-                <SelectItem value="painting_work">도장공사</SelectItem>
-                <SelectItem value="interior_woodwork">내장목공사</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3 flex items-center">
-              <Info className="h-5 w-5 mr-2" />
-              3. 중분류
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {["공사사항", "안전사항", "일반사항"].map((subCategory) => (
-                <Button
-                  key={subCategory}
-                  variant="outline"
-                  size="sm"
-                >
-                  {subCategory}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3 flex items-center">
-              <Tag className="h-5 w-5 mr-2" />
-              3. 태그
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {["공용부", "공통", "세대", "옥상", "주차장"].map((tag) => (
-                <Button
-                  key={tag}
-                  variant={selectedTag === tag ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedTag(tag)}
-                >
-                  {tag}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-3 border-l-4 border-blue-500 pl-3 flex items-center">
-              <CheckSquare className="h-5 w-5 mr-2" />
-              4. 내용
-            </h2>
-            <div className="space-y-2">
-              {["주차장", "옥상", "지하층", "공용부", "세대"].map((content) => (
-                <div key={content} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id={content}
-                    checked={selectedContent.includes(content)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedContent([...selectedContent, content])
-                      } else {
-                        setSelectedContent(selectedContent.filter(c => c !== content))
-                      }
-                    }}
-                    className="rounded"
-                  />
-                  <label htmlFor={content} className="text-sm">{content}</label>
-                </div>
-              ))}
-            </div>
-          </div>
+          <ContractConditionSelector 
+            onConditionsChange={(conditions) => {
+              console.log('선택된 계약조건:', conditions)
+              // 여기서 선택된 조건들을 처리할 수 있습니다
+            }}
+          />
         </TabsContent>
       </Tabs>
     </aside>
