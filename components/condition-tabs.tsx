@@ -6,8 +6,11 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
 import { conditionData, conditionCategories, workTypeNames } from "@/lib/condition-data"
-import { Search, CheckSquare, Square, Filter } from "lucide-react"
+import { RiskAssessmentPanel } from "@/components/risk-assessment-panel"
+import { Search, CheckSquare, Square, Filter, RotateCcw, Shield } from "lucide-react"
+import { analyzeRisk, type RiskAnalysis } from "@/lib/risk-assessment"
 
 interface ProjectInfo {
   name: string
@@ -22,18 +25,25 @@ interface ConditionTabsProps {
   projectInfo: ProjectInfo
   selectedConditions: any
   setSelectedConditions: (conditions: any) => void
+  showModal: (title: string, message: string, type: "success" | "warning" | "error", onConfirm?: () => void) => void
 }
 
-export function ConditionTabs({ projectInfo, selectedConditions, setSelectedConditions }: ConditionTabsProps) {
+export function ConditionTabs({ projectInfo, selectedConditions, setSelectedConditions, showModal }: ConditionTabsProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [showOnlySelected, setShowOnlySelected] = useState(false)
+  
+  // 현장 특수사항 추가 상태
+  const [customConditionText, setCustomConditionText] = useState("")
+  const [riskAnalysis, setRiskAnalysis] = useState<RiskAnalysis | null>(null)
+  const [showRiskAnalysis, setShowRiskAnalysis] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
 
   const handleConditionChange = (conditionId: string, checked: boolean, tab: string) => {
     const updatedConditions = { ...selectedConditions }
     const currentProjectConditions = updatedConditions[projectInfo.detailedType]
 
     if (checked) {
-      const dataSource = tab === "basic" ? conditionData.basic : conditionData[projectInfo.detailedType]?.[tab] || []
+      const dataSource = tab === "basic" ? conditionData.basic : (conditionData as any)[projectInfo.detailedType]?.[tab] || []
       const condition = dataSource.find((c: any) => c.id === conditionId)
       if (condition && !currentProjectConditions[tab].some((c: any) => c.id === conditionId)) {
         currentProjectConditions[tab].push(condition)
@@ -45,8 +55,130 @@ export function ConditionTabs({ projectInfo, selectedConditions, setSelectedCond
     setSelectedConditions(updatedConditions)
   }
 
+  // 현장 특수사항 추가 관련 함수들
+  const handleReviewRisk = async () => {
+    if (!customConditionText.trim()) {
+      showModal("입력 오류", "분석할 내용을 먼저 입력해 주세요.", "error")
+      return
+    }
+
+    setIsAnalyzing(true)
+    try {
+      // Call backend MISO workflow API
+      const res = await fetch("/api/miso/workflow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input_text: customConditionText.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || "API 오류")
+      }
+
+      // Create analysis based on MISO result
+      const misoResult = data?.result ?? ""
+      const hasUnfairClause = misoResult.includes("부당특약") || misoResult.includes("부당")
+      
+      const analysis = {
+        score: hasUnfairClause ? 75 : 5,
+        level: hasUnfairClause ? "high" as const : "low" as const,
+        category: hasUnfairClause ? "부당특약" : "일반사항",
+        issues: hasUnfairClause ? ["부당특약 발견"] : [],
+        suggestions: [misoResult], // MISO 결과를 권장사항으로 사용
+        blockedKeywords: [],
+      }
+      
+      setRiskAnalysis(analysis)
+      setShowRiskAnalysis(true)
+
+      // Optionally persist brief history
+      const history = JSON.parse(localStorage.getItem("risk-analysis-history") || "[]")
+      history.push({
+        text: customConditionText,
+        analysis,
+        timestamp: new Date().toISOString(),
+        misoResult: data?.result ?? "",
+      })
+      if (history.length > 10) {
+        history.shift()
+      }
+      localStorage.setItem("risk-analysis-history", JSON.stringify(history))
+    } catch (e: any) {
+      console.error(e)
+      showModal("API 오류", e?.message || "미소 API 호출 중 오류가 발생했습니다.", "error")
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+  const handleAddCustomCondition = () => {
+    if (!customConditionText.trim()) {
+      showModal("입력 오류", "추가할 내용을 먼저 입력해 주세요.", "error")
+      return
+    }
+
+    if (!riskAnalysis) {
+      showModal("경고", "위험도 분석을 먼저 진행해 주세요. 위험도 분석을 하지 않으면 조건을 추가할 수 없습니다.", "warning")
+      return
+    }
+
+    if (riskAnalysis.level === "critical" || riskAnalysis.level === "high") {
+      showModal(
+        "위험도 높음",
+        `위험도가 ${riskAnalysis.level === "critical" ? "매우 높은" : "높은"} 조건입니다. 강제로 추가하시겠습니까?`,
+        "warning",
+        () => {
+          // 강제 추가 로직
+          const newCondition = {
+            id: `custom-${Date.now()}`,
+            text: customConditionText.trim(),
+            riskLevel: riskAnalysis.level,
+            riskScore: riskAnalysis.score,
+            isForced: true, // 강제 추가 플래그
+          }
+
+          const updatedConditions = { ...selectedConditions }
+          updatedConditions[projectInfo.detailedType].custom.push(newCondition)
+          setSelectedConditions(updatedConditions)
+
+          setCustomConditionText("")
+          setRiskAnalysis(null)
+          setShowRiskAnalysis(false)
+          showModal("강제 추가 완료", "위험도가 높은 조건이 강제로 추가되었습니다. 별도 확인이 필요합니다.", "warning")
+        }
+      )
+      return
+    }
+
+    if (riskAnalysis.level === "medium") {
+      showModal("주의 필요", "중간 위험도의 조건입니다. 담당자와 협의 후 추가하시기 바랍니다.", "warning")
+    }
+
+    const newCondition = {
+      id: `custom-${Date.now()}`,
+      text: customConditionText.trim(),
+      riskLevel: riskAnalysis.level,
+      riskScore: riskAnalysis.score,
+    }
+
+    const updatedConditions = { ...selectedConditions }
+    updatedConditions[projectInfo.detailedType].custom.push(newCondition)
+    setSelectedConditions(updatedConditions)
+
+    setCustomConditionText("")
+    setRiskAnalysis(null)
+    setShowRiskAnalysis(false)
+    showModal("추가 완료", "현장 특수사항이 목록에 성공적으로 추가되었습니다.", "success")
+  }
+
+  const handleReset = () => {
+    setCustomConditionText("")
+    setRiskAnalysis(null)
+    setShowRiskAnalysis(false)
+  }
+
   const handleSelectAll = (tab: string) => {
-    const dataSource = tab === "basic" ? conditionData.basic : conditionData[projectInfo.detailedType]?.[tab] || []
+    const dataSource = tab === "basic" ? conditionData.basic : (conditionData as any)[projectInfo.detailedType]?.[tab] || []
     const updatedConditions = { ...selectedConditions }
     const currentProjectConditions = updatedConditions[projectInfo.detailedType]
 
@@ -88,7 +220,7 @@ export function ConditionTabs({ projectInfo, selectedConditions, setSelectedCond
     if (tab === "custom") {
       return selectedConditions[projectInfo.detailedType].custom.length
     }
-    const dataSource = tab === "basic" ? conditionData.basic : conditionData[projectInfo.detailedType]?.[tab] || []
+    const dataSource = tab === "basic" ? conditionData.basic : (conditionData as any)[projectInfo.detailedType]?.[tab] || []
     return dataSource.length
   }
 
@@ -188,6 +320,49 @@ export function ConditionTabs({ projectInfo, selectedConditions, setSelectedCond
 
       {/* 탭 컨텐츠 */}
       <div className="space-y-3 max-h-96 overflow-y-auto">{renderConditions()}</div>
+      
+      {/* 5. 현장 기본조건 - 현장 특수사항 추가 */}
+      <div className="mt-6 pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-md font-semibold">5. 현장 특수조건</h3>
+          <Button variant="ghost" size="sm" onClick={handleReset}>
+            <RotateCcw className="h-4 w-4 mr-1" />
+            초기화
+          </Button>
+        </div>
+        <div className="space-y-3">
+          <Textarea
+            placeholder="추가할 조건을 입력하세요..."
+            rows={3}
+            value={customConditionText}
+            onChange={(e) => setCustomConditionText(e.target.value)}
+          />
+          <Button
+            onClick={handleReviewRisk}
+            disabled={isAnalyzing || !customConditionText.trim()}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {isAnalyzing ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                분석 중...
+              </>
+            ) : (
+              <>
+                <Shield className="h-4 w-4 mr-2" />
+                위험도 분석
+              </>
+            )}
+          </Button>
+          <RiskAssessmentPanel analysis={riskAnalysis!} isVisible={showRiskAnalysis && !!riskAnalysis} />
+          <Button
+            onClick={handleAddCustomCondition}
+            className="w-full"
+          >
+            목록에 추가
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

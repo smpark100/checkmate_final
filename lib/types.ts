@@ -9,6 +9,7 @@ export interface ContractClause {
   공종명: string
   공종코드: string
   대분류: string
+  공종상세: string
   중분류: string
   태그: string
   내용: string

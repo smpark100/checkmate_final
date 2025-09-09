@@ -103,12 +103,14 @@ export default function QuoteGeneratorPage() {
     message: "",
     type: "success" as "success" | "warning" | "error",
     onConfirm: undefined as (() => void) | undefined,
+    onDelete: undefined as (() => void) | undefined,
+    showDelete: false,
   })
 
   const [showPDFDialog, setShowPDFDialog] = useState(false)
 
-  const showModal = useCallback((title: string, message: string, type: "success" | "warning" | "error", onConfirm?: () => void) => {
-    setModalState({ isOpen: true, title, message, type, onConfirm })
+  const showModal = useCallback((title: string, message: string, type: "success" | "warning" | "error", onConfirm?: () => void, onDelete?: () => void, showDelete?: boolean) => {
+    setModalState({ isOpen: true, title, message, type, onConfirm, onDelete, showDelete: showDelete || false })
   }, [])
 
   const hideModal = useCallback(() => {
@@ -168,6 +170,8 @@ export default function QuoteGeneratorPage() {
         type={modalState.type}
         onClose={hideModal}
         onConfirm={modalState.onConfirm}
+        onDelete={modalState.onDelete}
+        showDelete={modalState.showDelete}
       />
 
       <PDFExportDialog

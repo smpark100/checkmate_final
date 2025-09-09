@@ -10,9 +10,11 @@ interface ModalProps {
   type: "success" | "warning" | "error"
   onClose: () => void
   onConfirm?: () => void // 추가된 콜백 함수
+  onDelete?: () => void // 삭제 콜백 함수
+  showDelete?: boolean // 삭제 버튼 표시 여부
 }
 
-export function Modal({ isOpen, title, message, type, onClose, onConfirm }: ModalProps) {
+export function Modal({ isOpen, title, message, type, onClose, onConfirm, onDelete, showDelete }: ModalProps) {
   if (!isOpen) return null
 
   const getIcon = () => {
@@ -33,6 +35,13 @@ export function Modal({ isOpen, title, message, type, onClose, onConfirm }: Moda
     onClose()
   }
 
+  const handleDelete = () => {
+    if (onDelete) {
+      onDelete()
+    }
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4 animate-in fade-in-0 zoom-in-95">
@@ -46,8 +55,13 @@ export function Modal({ isOpen, title, message, type, onClose, onConfirm }: Moda
                 확인
               </Button>
             )}
-            <Button onClick={onClose} variant={onConfirm ? "outline" : "default"}>
-              {onConfirm ? "취소" : "확인"}
+            {showDelete && onDelete && (
+              <Button onClick={handleDelete} variant="destructive">
+                삭제
+              </Button>
+            )}
+            <Button onClick={onClose} variant={onConfirm || showDelete ? "outline" : "default"}>
+              {onConfirm || showDelete ? "취소" : "확인"}
             </Button>
           </div>
         </div>

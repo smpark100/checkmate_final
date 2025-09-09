@@ -22,6 +22,7 @@ interface ProjectInfo {
 interface Condition {
   id: string;
   text: string;
+  isForced?: boolean;
 }
 
 type ConditionBuckets = {
@@ -305,6 +306,7 @@ export function PreviewPanel({ projectInfo, selectedConditions, setProjectInfo, 
         <div className="mb-6">
           <h2 className="font-bold text-lg">5. 현장 기본조건</h2>
           <div className="space-y-2 mt-3 text-sm leading-6">
+            {/* 기본 조건들 */}
             {currentConditions.basic.length > 0 ? (
               currentConditions.basic.map((c, i) => (
                 <div key={c.id || String(i)} className="text-pretty pl-6">
@@ -314,21 +316,16 @@ export function PreviewPanel({ projectInfo, selectedConditions, setProjectInfo, 
             ) : (
               <div className="text-gray-500 pl-6">좌측 패널에서 기본조건을 선택하세요.</div>
             )}
-          </div>
-        </div>
-
-        {/* 6. 현장 특기사항 */}
-        <div className="mb-2">
-          <h2 className="font-bold text-lg">6. 현장 특기사항</h2>
-          <div className="space-y-2 mt-3 text-sm leading-6">
-            {currentConditions.custom.length > 0 ? (
-              currentConditions.custom.map((c, i) => (
-                <div key={c.id || String(i)} className={`text-pretty pl-6 ${c.isForced ? 'bg-yellow-100 px-2 py-1 rounded border-l-4 border-yellow-400' : ''}`}>
-                  <span className="font-medium">{i + 1})</span> {c.text}
-                </div>
-              ))
-            ) : (
-              <div className="text-gray-500 pl-6">좌측 패널에서 특기사항을 추가하세요.</div>
+            
+            {/* 현장 특수조건들 (custom 조건들) */}
+            {currentConditions.custom.length > 0 && (
+              <>
+                {currentConditions.custom.map((c, i) => (
+                  <div key={c.id || String(i)} className={`text-pretty pl-6 ${c.isForced ? 'bg-yellow-100 px-2 py-1 rounded border-l-4 border-yellow-400' : ''}`}>
+                    <span className="font-medium">{currentConditions.basic.length + i + 1})</span> {c.text}
+                  </div>
+                ))}
+              </>
             )}
           </div>
         </div>
