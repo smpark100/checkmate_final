@@ -321,6 +321,67 @@ export function ConditionTabs({ projectInfo, selectedConditions, setSelectedCond
       {/* 탭 컨텐츠 */}
       <div className="space-y-3 max-h-96 overflow-y-auto">{renderConditions()}</div>
       
+      {/* 현장 공사사항 섹션 */}
+      <div className="mt-6 pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">현장 공사사항</h3>
+          <Badge variant="outline" className="text-xs">
+            {getSelectedCount("construction")}/{getTotalCount("construction")}
+          </Badge>
+        </div>
+        
+        {getTotalCount("construction") > 0 && (
+          <div className="flex items-center justify-between text-sm mb-3">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => handleSelectAll("construction")} className="h-8 px-2">
+                <CheckSquare className="h-4 w-4 mr-1" />
+                전체 선택
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleDeselectAll("construction")} className="h-8 px-2">
+                <Square className="h-4 w-4 mr-1" />
+                전체 해제
+              </Button>
+            </div>
+            <div className="text-gray-500">{getSelectedCount("construction")}개 선택됨</div>
+          </div>
+        )}
+        
+        <div className="space-y-3 max-h-64 overflow-y-auto">
+          {getTotalCount("construction") > 0 ? (
+            (conditionData as any)[projectInfo.detailedType]?.construction?.map((condition: any) => {
+              const isChecked = selectedConditions[projectInfo.detailedType]["construction"].some((c: any) => c.id === condition.id)
+              
+              return (
+                <Card
+                  key={condition.id}
+                  className={`p-3 transition-all hover:shadow-sm ${isChecked ? "bg-blue-50 border-blue-200" : "hover:bg-gray-50"}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={isChecked}
+                      onCheckedChange={(checked) =>
+                        handleConditionChange(condition.id, checked as boolean, "construction")
+                      }
+                      className="mt-1 flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700 leading-relaxed text-pretty">{condition.text}</p>
+                      {isChecked && (
+                        <Badge variant="secondary" className="mt-2 text-xs">
+                          선택됨
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )
+            })
+          ) : (
+            <p className="text-gray-500 text-center py-8">현재 공종에 대한 공사사항이 없습니다.</p>
+          )}
+        </div>
+      </div>
+      
       {/* 5. 현장 기본조건 - 현장 특수사항 추가 */}
       <div className="mt-6 pt-4 border-t border-gray-200">
         <div className="flex items-center justify-between mb-2">

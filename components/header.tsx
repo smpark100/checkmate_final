@@ -1,14 +1,14 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { FileDown, Save } from "lucide-react"
+import { Printer, Save } from "lucide-react"
 
 interface HeaderProps {
-  onExportPdf: () => void
+  onPrint: () => void
   onTempSave: () => void
 }
 
-export function Header({ onExportPdf, onTempSave }: HeaderProps) {
+export function Header({ onPrint, onTempSave }: HeaderProps) {
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm px-4 py-3 flex items-center justify-between flex-shrink-0">
       <div className="flex items-center gap-4">
@@ -19,9 +19,9 @@ export function Header({ onExportPdf, onTempSave }: HeaderProps) {
           <Save className="h-4 w-4 mr-2" />
           임시저장
         </Button>
-        <Button onClick={onExportPdf} size="sm" className="bg-blue-600 hover:bg-blue-700">
-          <FileDown className="h-4 w-4 mr-2" />
-          PDF로 내보내기
+        <Button onClick={onPrint} size="sm" className="bg-blue-600 hover:bg-blue-700">
+          <Printer className="h-4 w-4 mr-2" />
+          출력하기
         </Button>
       </div>
     </header>

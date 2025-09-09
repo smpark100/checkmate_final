@@ -23,6 +23,12 @@ interface Condition {
   id: string;
   text: string;
   isForced?: boolean;
+  uploadedImages?: Array<{
+    id: string;
+    file: File;
+    preview: string;
+    description?: string;
+  }>;
 }
 
 type ConditionBuckets = {
@@ -40,6 +46,7 @@ interface PreviewPanelProps {
   };
   setProjectInfo?: (info: ProjectInfo) => void;
   misoResult?: string;
+  isPrintMode?: boolean;
 }
 
 const EMPTY_BUCKETS: ConditionBuckets = {
@@ -50,7 +57,7 @@ const EMPTY_BUCKETS: ConditionBuckets = {
         custom: [],
 };
 
-export function PreviewPanel({ projectInfo, selectedConditions, setProjectInfo, misoResult }: PreviewPanelProps) {
+export function PreviewPanel({ projectInfo, selectedConditions, setProjectInfo, misoResult, isPrintMode = false }: PreviewPanelProps) {
   const [currentTime, setCurrentTime] = useState<string>("");
   
   useEffect(() => {
@@ -59,7 +66,15 @@ export function PreviewPanel({ projectInfo, selectedConditions, setProjectInfo, 
   }, []);
 
   const currentConditions = useMemo<ConditionBuckets>(() => {
-    return selectedConditions[projectInfo.detailedType] ?? EMPTY_BUCKETS;
+    const conditions = selectedConditions[projectInfo.detailedType] ?? EMPTY_BUCKETS;
+    console.log('PreviewPanel에서 받은 selectedConditions:', selectedConditions);
+    console.log('현재 프로젝트 타입:', projectInfo.detailedType);
+    console.log('현재 조건들:', conditions);
+    console.log('basic 조건 개수:', conditions.basic.length);
+    console.log('construction 조건 개수:', conditions.construction.length);
+    console.log('basic 조건 상세 내용:', conditions.basic);
+    console.log('construction 조건 상세 내용:', conditions.construction);
+    return conditions;
   }, [selectedConditions, projectInfo.detailedType]);
 
   const today = useMemo(() => new Date(), []);
@@ -111,8 +126,11 @@ export function PreviewPanel({ projectInfo, selectedConditions, setProjectInfo, 
   }, [projectInfo.orderVolumeRate, suppliedMaterialsByType]);
 
   return (
-    <section className="w-2/3 bg-gray-100 p-8 overflow-y-auto">
-      <div id="previewDocument" className="bg-white p-10 shadow-lg rounded-lg max-w-4xl mx-auto min-h-full">
+    <section className={isPrintMode ? "w-full h-full bg-white overflow-y-auto" : "w-2/3 bg-gray-100 p-8 overflow-y-auto"}>
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-gray-900 border-l-4 border-blue-500 pl-3">견적조건 미리보기</h2>
+      </div>
+      <div id="previewDocument" className={isPrintMode ? "bg-white p-6 w-full h-full" : "bg-white p-10 shadow-lg rounded-lg max-w-4xl mx-auto min-h-full"}>
         {/* 헤더: 로고 + 메타 정보 */}
         <div className="border border-gray-300 rounded-md p-4 mb-6">
           <div className="flex items-center justify-between gap-4">
@@ -308,11 +326,14 @@ export function PreviewPanel({ projectInfo, selectedConditions, setProjectInfo, 
           <div className="space-y-2 mt-3 text-sm leading-6">
             {/* 기본 조건들 */}
             {currentConditions.basic.length > 0 ? (
-              currentConditions.basic.map((c, i) => (
-                <div key={c.id || String(i)} className="text-pretty pl-6">
-                  <span className="font-medium">{i + 1})</span> {c.text}
-                </div>
-              ))
+              currentConditions.basic.map((c, i) => {
+                console.log(`렌더링 중인 basic 조건 ${i}:`, c);
+                return (
+                  <div key={c.id || String(i)} className="text-pretty pl-6">
+                    <span className="font-medium">{i + 1})</span> {c.text}
+                  </div>
+                );
+              })
             ) : (
               <div className="text-gray-500 pl-6">좌측 패널에서 기본조건을 선택하세요.</div>
             )}
@@ -326,6 +347,46 @@ export function PreviewPanel({ projectInfo, selectedConditions, setProjectInfo, 
                   </div>
                 ))}
               </>
+            )}
+          </div>
+        </div>
+
+        {/* 6. 현장 공사사항 */}
+        <div className="mb-6">
+          <h2 className="font-bold text-lg">6. 현장 공사사항</h2>
+          <div className="space-y-2 mt-3 text-sm leading-6">
+            {/* 공사 조건들 */}
+            {currentConditions.construction.length > 0 ? (
+              currentConditions.construction.map((c, i) => {
+                console.log(`렌더링 중인 construction 조건 ${i}:`, c);
+                return (
+                  <div key={c.id || String(i)} className="text-pretty pl-6">
+                    <div className="flex items-start gap-2">
+                      <span className="font-medium">{i + 1})</span>
+                      <div className="flex-1">
+                        <div>{c.text}</div>
+                        {/* 업로드된 이미지 표시 */}
+                        {c.uploadedImages && c.uploadedImages.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {c.uploadedImages.map((image, imgIndex) => (
+                              <div key={imgIndex} className="relative">
+                                <img
+                                  src={image.preview}
+                                  alt={`첨부 이미지 ${imgIndex + 1}`}
+                                  className="max-w-full h-auto rounded border border-gray-200"
+                                  style={{ maxHeight: '300px' }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-gray-500 pl-6">좌측 패널에서 공사사항을 선택하세요.</div>
             )}
           </div>
         </div>

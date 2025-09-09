@@ -1,0 +1,5 @@
+[33mdd34ff5[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/pdf_export[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m 프로그램 제목을 '견적 조건 Master(by CheckMate)'로 변경
+[33m028a21a[m 위험도 분석 기능을 계약조건 섹션에 추가 - 각 중분류 탭에 맞게 조건 추가 가능
+[33m7586008[m feat: 계약조건 선택 시스템 구현 완료
+[33mbdf36a6[m Initial commit: v0-CheckMate project
+[33me217223[m Initialized repository for project 견적 조건서 생성기

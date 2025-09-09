@@ -5,7 +5,6 @@ import { Header } from "@/components/header"
 import { ControlPanel } from "@/components/control-panel"
 import { PreviewPanel } from "@/components/preview-panel"
 import { Modal } from "@/components/modal"
-import { PDFExportDialog } from "@/components/pdf-export-dialog"
 
 interface ProjectInfo {
   name: string
@@ -107,7 +106,7 @@ export default function QuoteGeneratorPage() {
     showDelete: false,
   })
 
-  const [showPDFDialog, setShowPDFDialog] = useState(false)
+  const [showPrintDialog, setShowPrintDialog] = useState(false)
 
   const showModal = useCallback((title: string, message: string, type: "success" | "warning" | "error", onConfirm?: () => void, onDelete?: () => void, showDelete?: boolean) => {
     setModalState({ isOpen: true, title, message, type, onConfirm, onDelete, showDelete: showDelete || false })
@@ -117,24 +116,9 @@ export default function QuoteGeneratorPage() {
     setModalState((prev) => ({ ...prev, isOpen: false }))
   }, [])
 
-  const handleExportPdf = useCallback(() => {
-    setShowPDFDialog(true)
+  const handlePrint = useCallback(() => {
+    setShowPrintDialog(true)
   }, [])
-
-  const handlePDFExportSuccess = useCallback(
-    (message: string) => {
-      showModal("내보내기 완료", message, "success")
-      setShowPDFDialog(false)
-    },
-    [showModal],
-  )
-
-  const handlePDFExportError = useCallback(
-    (message: string) => {
-      showModal("내보내기 오류", message, "error")
-    },
-    [showModal],
-  )
 
   const handleTempSave = useCallback(() => {
     const saveData = {
@@ -148,7 +132,7 @@ export default function QuoteGeneratorPage() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <Header onExportPdf={handleExportPdf} onTempSave={handleTempSave} />
+      <Header onPrint={handlePrint} onTempSave={handleTempSave} />
 
       <main className="flex-grow flex overflow-hidden">
         <ControlPanel
@@ -174,14 +158,42 @@ export default function QuoteGeneratorPage() {
         showDelete={modalState.showDelete}
       />
 
-      <PDFExportDialog
-        isOpen={showPDFDialog}
-        onClose={() => setShowPDFDialog(false)}
-        projectInfo={projectInfo}
-        selectedConditions={selectedConditions}
-        onSuccess={handlePDFExportSuccess}
-        onError={handlePDFExportError}
-      />
+      {/* Print Preview Dialog */}
+      {showPrintDialog && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white w-full h-full flex flex-col">
+            <div className="flex items-center justify-between p-3 border-b bg-gray-50">
+              <h2 className="text-lg font-semibold">인쇄 미리보기</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    window.print()
+                    setShowPrintDialog(false)
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  인쇄하기
+                </button>
+                <button
+                  onClick={() => setShowPrintDialog(false)}
+                  className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <PreviewPanel 
+                projectInfo={projectInfo} 
+                selectedConditions={selectedConditions} 
+                setProjectInfo={setProjectInfo} 
+                misoResult={misoResult}
+                isPrintMode={true}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

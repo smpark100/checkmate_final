@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,6 +12,7 @@ import { RiskAssessmentPanel } from "@/components/risk-assessment-panel"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { RotateCcw, Shield } from "lucide-react"
 import { analyzeRisk, type RiskAnalysis } from "@/lib/risk-assessment"
+import { ContractClause } from "@/lib/types"
 
 interface ProjectInfo {
   name: string
@@ -50,6 +51,7 @@ export function ControlPanel({
   const [siteSearchTerm, setSiteSearchTerm] = useState("")
   const [siteOptions, setSiteOptions] = useState<Array<{ label: string; value: string }>>([])
   const [presets, setPresets] = useState<Record<string, any>>({})
+  const [contractConditions, setContractConditions] = useState<ContractClause[]>([])
   
 
   useEffect(() => {
@@ -114,6 +116,51 @@ export function ControlPanel({
   const handleProjectInfoChange = (field: keyof ProjectInfo, value: string) => {
     setProjectInfo({ ...projectInfo, [field]: value })
   }
+
+  const handleContractConditionsChange = useCallback((conditions: ContractClause[]) => {
+    console.log('선택된 계약조건:', conditions)
+    setContractConditions(conditions)
+    
+    // ContractConditionSelector에서 선택된 조건들을 construction 조건으로 추가 (이미지 포함)
+    const contractConstructionConditions = conditions.map((condition, index) => ({
+      id: `contract-${condition.공종코드}-${index}`,
+      text: condition.내용,
+      isForced: condition.중요표기 === '중요',
+      uploadedImages: condition.uploadedImages || []
+    }))
+    
+    console.log('생성된 contractConstructionConditions:', contractConstructionConditions)
+    
+    // 기존 selectedConditions의 construction 조건과 ContractConditionSelector 조건을 병합
+    setSelectedConditions(prev => {
+      const currentProjectConditions = prev[projectInfo.detailedType] || {
+        basic: [],
+        construction: [],
+        safety: [],
+        quality: [],
+        custom: []
+      }
+      
+      // 기존 construction 조건에서 contract-로 시작하지 않는 조건들만 유지
+      const existingConstructionConditions = currentProjectConditions.construction.filter(
+        condition => !condition.id.startsWith('contract-')
+      )
+      
+      const newConditions = {
+        ...prev,
+        [projectInfo.detailedType]: {
+          ...currentProjectConditions,
+          construction: [...existingConstructionConditions, ...contractConstructionConditions]
+        }
+      }
+      
+      console.log('ContractConditionSelector에서 업데이트된 selectedConditions:', newConditions)
+      console.log('현재 프로젝트 타입:', projectInfo.detailedType)
+      console.log('추가된 construction 조건들:', contractConstructionConditions)
+      
+      return newConditions
+    })
+  }, [projectInfo.detailedType])
 
 
   return (
@@ -190,10 +237,7 @@ export function ControlPanel({
 
         <TabsContent value="contract-conditions" className="space-y-6 mt-6">
           <ContractConditionSelector 
-            onConditionsChange={(conditions) => {
-              console.log('선택된 계약조건:', conditions)
-              // 여기서 선택된 조건들을 처리할 수 있습니다
-            }}
+            onConditionsChange={handleContractConditionsChange}
           />
         </TabsContent>
       </Tabs>

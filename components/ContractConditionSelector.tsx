@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -44,7 +44,7 @@ export function ContractConditionSelector({ onConditionsChange }: ContractCondit
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false)
 
   // 위험도 분석 함수들
-  const handleReviewRisk = async () => {
+  const handleReviewRisk = useCallback(async () => {
     if (!customConditionText.trim()) return
 
     try {
@@ -57,9 +57,9 @@ export function ContractConditionSelector({ onConditionsChange }: ContractCondit
     } finally {
       setIsAnalyzing(false)
     }
-  }
+  }, [customConditionText])
 
-  const handleAddCustomCondition = () => {
+  const handleAddCustomCondition = useCallback(() => {
     if (!customConditionText.trim()) {
       alert("추가할 내용을 먼저 입력해 주세요.")
       return
@@ -86,22 +86,21 @@ export function ContractConditionSelector({ onConditionsChange }: ContractCondit
     // 선택된 조건에 추가
     const updatedConditions = [...selectedConditions, newCondition]
     setSelectedConditions(updatedConditions)
-    onConditionsChange(updatedConditions)
 
     // 초기화
     setCustomConditionText('')
     setRiskAnalysis(null)
     setShowRiskAnalysis(false)
-  }
+  }, [customConditionText, riskAnalysis, selectedWorkType, selectedCategory, selectedSubCategory, selectedTag, selectedConditions])
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setCustomConditionText('')
     setRiskAnalysis(null)
     setShowRiskAnalysis(false)
-  }
+  }, [])
 
   // CSV 데이터 로드
-  const loadCSVData = async () => {
+  const loadCSVData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -133,11 +132,11 @@ export function ContractConditionSelector({ onConditionsChange }: ContractCondit
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadCSVData()
-  }, [])
+  }, [loadCSVData])
 
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -165,18 +164,27 @@ export function ContractConditionSelector({ onConditionsChange }: ContractCondit
   const filteredClauses = getFilteredClauses(clauses, selectedWorkType, selectedCategory, selectedSubCategory, selectedTag)
 
   // 조건 선택/해제
-  const toggleCondition = (clause: ContractClause) => {
+  const toggleCondition = useCallback((clause: ContractClause) => {
     const isSelected = selectedConditions.some(c => c.공종코드 === clause.공종코드 && c.내용 === clause.내용)
+    console.log('toggleCondition 호출:', clause.내용, 'isSelected:', isSelected)
    
     if (isSelected) {
-      setSelectedConditions(prev => prev.filter(c => !(c.공종코드 === clause.공종코드 && c.내용 === clause.내용)))
+      setSelectedConditions(prev => {
+        const filtered = prev.filter(c => !(c.공종코드 === clause.공종코드 && c.내용 === clause.내용))
+        console.log('조건 제거 후:', filtered)
+        return filtered
+      })
     } else {
-      setSelectedConditions(prev => [...prev, clause])
+      setSelectedConditions(prev => {
+        const added = [...prev, clause]
+        console.log('조건 추가 후:', added)
+        return added
+      })
     }
-  }
+  }, [selectedConditions])
 
   // 이미지 업로드
-  const handleImageUpload = async (clause: ContractClause, files: FileList) => {
+  const handleImageUpload = useCallback(async (clause: ContractClause, files: FileList) => {
     const clauseKey = `${clause.공종코드}-${clause.내용}`
     const newImages: UploadedImage[] = []
    
@@ -200,19 +208,19 @@ export function ContractConditionSelector({ onConditionsChange }: ContractCondit
       ...prev,
       [clauseKey]: [...(prev[clauseKey] || []), ...newImages]
     }))
-  }
+  }, [])
 
   // 이미지 삭제
-  const removeImage = (clause: ContractClause, imageId: string) => {
+  const removeImage = useCallback((clause: ContractClause, imageId: string) => {
     const clauseKey = `${clause.공종코드}-${clause.내용}`
     setUploadingImages(prev => ({
       ...prev,
       [clauseKey]: (prev[clauseKey] || []).filter(img => img.id !== imageId)
     }))
-  }
+  }, [])
 
   // 선택된 조건 변경 시 부모 컴포넌트에 알림
-  useEffect(() => {
+  const notifyConditionsChange = useCallback(() => {
     const conditionsWithImages = selectedConditions.map(condition => {
       const clauseKey = `${condition.공종코드}-${condition.내용}`
       const uploadedImages = uploadingImages[clauseKey] || []
@@ -221,8 +229,13 @@ export function ContractConditionSelector({ onConditionsChange }: ContractCondit
         uploadedImages
       }
     })
+    console.log('ContractConditionSelector에서 onConditionsChange 호출:', conditionsWithImages)
     onConditionsChange(conditionsWithImages)
   }, [selectedConditions, uploadingImages, onConditionsChange])
+
+  useEffect(() => {
+    notifyConditionsChange()
+  }, [notifyConditionsChange])
 
   if (loading) {
     return (

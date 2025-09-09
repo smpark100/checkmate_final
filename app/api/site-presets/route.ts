@@ -13,17 +13,17 @@ export async function GET() {
     }
 
     const csvContent = fs.readFileSync(csvPath, 'utf-8');
-    const lines = csvContent.trim().split('\n');
-    const headers = lines[0].split(',');
+    const lines = csvContent.trim().split(/\r?\n/);
+    const headers = lines[0].split(',').map(header => header.trim().replace(/\r/g, ''));
     
     console.log("CSV headers:", headers);
     
     const presets = lines.slice(1).map(line => {
-      const values = line.split(',');
+      const values = line.split(',').map(value => value.trim().replace(/\r/g, ''));
       const row: any = {};
       
       headers.forEach((header, index) => {
-        row[header.trim()] = values[index]?.trim() || '';
+        row[header] = values[index] || '';
       });
       
       return {
