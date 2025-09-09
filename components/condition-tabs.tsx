@@ -104,8 +104,10 @@ export function ConditionTabs({ projectInfo, selectedConditions, setSelectedCond
       }
       localStorage.setItem("risk-analysis-history", JSON.stringify(history))
     } catch (e: any) {
-      console.error(e)
-      showModal("API 오류", e?.message || "미소 API 호출 중 오류가 발생했습니다.", "error")
+      console.error("MISO API 오류:", e)
+      const errorMessage = e?.message || "MISO API 호출 중 오류가 발생했습니다."
+      const errorDetails = e?.details ? `\n\n상세 정보: ${e.details}` : ""
+      showModal("API 오류", `${errorMessage}${errorDetails}`, "error")
     } finally {
       setIsAnalyzing(false)
     }
